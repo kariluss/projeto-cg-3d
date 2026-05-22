@@ -1,0 +1,26 @@
+{
+  "name": "webgl-3d-game-engine",
+  "version": "0.1.0",
+  "description": "Motor de jogo 3D com WebGL puro, sem bibliotecas gráficas de alto nível",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "python -m http.server 8000"
+  },
+  "keywords": [
+    "webgl",
+    "3d",
+    "game-engine",
+    "javascript",
+    "glsl"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {}
+}

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Game Engine - WebGL Puro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            background: #0a0e27;
+            color: #e0e0e0;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 14, 39, 0.9);
+            border: 2px solid #00ff88;
+            border-radius: 8px;
+            padding: 15px 20px;
+            font-size: 13px;
+            line-height: 1.6;
+            max-width: 300px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+            font-family: 'Courier New', monospace;
+            z-index: 100;
+        }
+
+        #info-panel h2 {
+            color: #00ff88;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #info-panel p {
+            color: #a0a0a0;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        #info-panel span {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(10, 14, 39, 0.9);
+            border: 2px solid #00ff88;
+            border-radius: 8px;
+            padding: 15px 20px;
+            max-width: 250px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+        }
+
+        #controls h3 {
+            color: #00ff88;
+            font-size: 13px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #controls p {
+            color: #a0a0a0;
+            font-size: 11px;
+            margin: 5px 0;
+            line-height: 1.5;
+        }
+
+        #controls kbd {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid #00ff88;
+            border-radius: 3px;
+            padding: 2px 6px;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            margin: 0 2px;
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+            }
+        }
+
+        #info-panel {
+            animation: glow-pulse 3s ease-in-out infinite;
+        }
+
+        .stat-label {
+            display: inline-block;
+            width: 50px;
+            color: #00ff88;
+        }
+
+        .stat-value {
+            color: #e0e0e0;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="info-panel">
+        <h2>⚡ Engine Status</h2>
+        <p><span class="stat-label">FPS</span>: <span id="fps" class="stat-value">0</span></p>
+        <p><span class="stat-label">Draw Calls</span>: <span id="drawCalls" class="stat-value">0</span></p>
+        <p><span class="stat-label">Vertices</span>: <span id="vertices" class="stat-value">0</span></p>
+        <hr style="border: none; border-top: 1px solid rgba(0, 255, 136, 0.2); margin: 10px 0;">
+        <p><span class="stat-label">Camera</span></p>
+        <p style="margin-left: 5px;">Pos: <span id="camPos" class="stat-value">[0, 0, 0]</span></p>
+        <p style="margin-left: 5px;">Rot: <span id="camRot" class="stat-value">[0, 0, 0]</span></p>
+    </div>
+
+    <div id="controls">
+        <h3>🎮 Controles</h3>
+        <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> - Movimento</p>
+        <p><kbd>SPACE</kbd> / <kbd>CTRL</kbd> - Cima / Baixo</p>
+        <p><kbd>Mouse</kbd> - Câmera (clique + arraste)</p>
+        <p><kbd>SHIFT</kbd> - Velocidade rápida</p>
+        <p style="margin-top: 10px; color: #00ff88;">F12 para DevTools</p>
+    </div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
