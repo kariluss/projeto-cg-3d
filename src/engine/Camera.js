@@ -64,15 +64,21 @@ export class Camera {
         vec3.cross(right, this.front, this.up);
         vec3.normalize(right, right);
 
-        // Movimento WASD
+        // Vetor "flatFront" (Frente achatada). 
+        // Pega a direção que estamos olhando, mas zera a inclinação (Y = 0).
+        // Isso impede que o jogador voe ou entre no chão ao olhar para cima/baixo.
+        const flatFront = vec3.fromValues(this.front[0], 0, this.front[2]);
+        vec3.normalize(flatFront, flatFront);
+
+        // Movimento WASD (usando flatFront ao invés de this.front)
         if (input.isKeyPressed('w')) {
             const move = vec3.create();
-            vec3.scale(move, this.front, currentSpeed);
+            vec3.scale(move, flatFront, currentSpeed);
             vec3.add(this.position, this.position, move);
         }
         if (input.isKeyPressed('s')) {
             const move = vec3.create();
-            vec3.scale(move, this.front, currentSpeed);
+            vec3.scale(move, flatFront, currentSpeed);
             vec3.sub(this.position, this.position, move);
         }
         if (input.isKeyPressed('d')) {
@@ -85,10 +91,6 @@ export class Camera {
             vec3.scale(move, right, currentSpeed);
             vec3.sub(this.position, this.position, move);
         }
-
-        // Movimento vertical (Voar/Descer - Útil pra debugar)
-        if (input.isKeyPressed(' ')) this.position[1] += currentSpeed;
-        if (input.isKeyPressed('control')) this.position[1] -= currentSpeed;
 
         // Controle de mouse (Olhar)
         const delta = input.getMouseDelta();
