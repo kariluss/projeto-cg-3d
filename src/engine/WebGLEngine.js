@@ -1,8 +1,3 @@
-/**
- * WebGLEngine
- * Motor WebGL que gerencia contexto, renderização e estado gráfico
- */
-
 import { Shader } from './Shader.js';
 import { Camera } from './Camera.js';
 
@@ -10,10 +5,8 @@ export class WebGLEngine {
     constructor(canvas) {
         this.canvas = canvas;
         
-        // Fundo escuro criado PRIMEIRO
         this.clearColor = [0.02, 0.02, 0.05, 1.0];
         
-        // Só agora inicializamos o WebGL
         this.gl = this.initWebGL(); 
         this.camera = new Camera(canvas);
 
@@ -43,8 +36,6 @@ export class WebGLEngine {
         }
 
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Agora this.clearColor existe e o spread vai funcionar perfeitamente!
         gl.clearColor(...this.clearColor); 
         
         gl.enable(gl.DEPTH_TEST);
@@ -90,41 +81,45 @@ export class WebGLEngine {
         in vec3 vFragPos;
         in vec2 vTexCoord;
 
+        // Variaveis de Iluminação (Posição do Player e Direção do Olhar)
         uniform vec3 uViewPos;  
-        uniform vec3 uLightPos; 
+        uniform vec3 uFront;    
 
         out vec4 FragColor;
 
         void main() {
-            // 1. Ambiente
-            float ambientStrength = 0.15;
-            vec3 ambient = ambientStrength * vColor;
+            // 1. Ambiente (Global)
+            vec3 ambient = vec3(0.05, 0.05, 0.08) * vColor;
             
-            // 2. Difusa
             vec3 norm = normalize(vNormal);
-            vec3 lightDir = normalize(uLightPos - vFragPos);
-            float diff = max(dot(norm, lightDir), 0.0);
-            
-            // Cor da luz (Laranja forte)
-            vec3 lightColor = vec3(1.0, 0.9, 0.7) * 2.0; 
-            vec3 diffuse = diff * lightColor * vColor;
-            
-            // 3. Especular
-            float specularStrength = 0.6;
+            vec3 lightDir = normalize(uViewPos - vFragPos); 
             vec3 viewDir = normalize(uViewPos - vFragPos);
+            float dist = length(uViewPos - vFragPos);
+
+            // 2. Pontual (Glow do Player)
+            float attenPoint = 1.0 / (1.0 + 0.14 * dist + 0.07 * (dist * dist));
+            float diffPoint = max(dot(norm, lightDir), 0.0);
+            vec3 glowColor = vec3(0.3, 0.3, 0.3); 
+            vec3 diffusePoint = diffPoint * glowColor * vColor * attenPoint;
+
+            // 3. Spotlight (Lanterna)
+            float theta = dot(normalize(-lightDir), normalize(uFront));
+            float cutOff = cos(radians(12.5));
+            float outerCutOff = cos(radians(17.5));
+            float epsilon = cutOff - outerCutOff;
+            float intensity = clamp((theta - outerCutOff) / epsilon, 0.0, 1.0);
+
+            float attenSpot = 1.0 / (1.0 + 0.045 * dist + 0.0075 * (dist * dist));
+            float diffSpot = max(dot(norm, lightDir), 0.0);
+            vec3 flashColor = vec3(1.0, 0.9, 0.7) * 2.0; 
+            
+            vec3 diffuseSpot = diffSpot * flashColor * vColor * intensity * attenSpot;
+
             vec3 reflectDir = reflect(-lightDir, norm);  
             float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-            vec3 specular = specularStrength * spec * lightColor;
-            
-            // 4. Atenuação (Usando lightDist ao invés de distance para evitar erro GLSL)
-            float lightDist = length(uLightPos - vFragPos);
-            float atten = 1.0 / (1.0 + 0.045 * lightDist + 0.0075 * (lightDist * lightDist));
-            
-            ambient  *= atten;
-            diffuse  *= atten;
-            specular *= atten;
+            vec3 specularSpot = spec * flashColor * 0.6 * intensity * attenSpot;
 
-            vec3 result = ambient + diffuse + specular;
+            vec3 result = ambient + diffusePoint + diffuseSpot + specularSpot;
             FragColor = vec4(result, 1.0);
         }
         `;
@@ -145,7 +140,6 @@ export class WebGLEngine {
 
         this.gl.viewport(0, 0, width, height);
         
-        // Assegure-se que a sua classe Camera tenha esse método implementado!
         if(this.camera.onWindowResize) {
             this.camera.onWindowResize();
         }
@@ -156,49 +150,34 @@ export class WebGLEngine {
     }
 
     render(meshes, deltaTime) {
-        // Atualizar câmera
         this.camera.update(deltaTime);
-
-        // Limpar a tela
         this.clear();
-
-        // Reset stats
         this.stats.drawCalls = 0;
         this.stats.vertices = 0;
 
-        // Usar shader
         this.shader.use();
 
-        // Passar matrizes de Visão e Projeção
         const viewMatrix = this.camera.getViewMatrix();
         const projMatrix = this.camera.getProjectionMatrix();
 
-        // IMPORTANTE: Sua classe Shader.js precisa ter o método 'setUniformMatrix4fv' ou equivalente.
-        // Assumindo que setUniformArray faz isso:
         this.shader.setUniformArray('uView', viewMatrix);
         this.shader.setUniformArray('uProjection', projMatrix);
 
-        // Atualizar Variáveis de Iluminação Dinâmica (O Segredo do Requisito de Luz)
-        // Estamos amarrando a fonte de luz à posição atual da câmera (Lanterna do Jogador)
         const camPos = this.camera.getPosition ? this.camera.getPosition() : [0, 0, 0]; 
+        const camFront = this.camera.front; 
         
-        // Precisamos verificar se sua Shader.js tem setUniform3f, caso não, ajuste para a chamada correta
         if (this.shader.setUniform3f) {
             this.shader.setUniform3f('uViewPos', camPos[0], camPos[1], camPos[2]);
-            this.shader.setUniform3f('uLightPos', camPos[0], camPos[1], camPos[2]);
+            this.shader.setUniform3f('uFront', camFront[0], camFront[1], camFront[2]);
+            // REPARE QUE AQUI NÃO TEM MAIS O uLightPos! 
         }
 
-        // Renderizar cada mesh
         for (const mesh of meshes) {
-            // Passar matriz model (Transformações do objeto: Posição, Rotação, Escala)
             if (mesh.transform) {
                 const modelMatrix = mesh.transform.getModelMatrix();
                 this.shader.setUniformArray('uModel', modelMatrix);
             }
-
-            // Desenhar chamando os buffers armazenados no Mesh
             mesh.draw(this.shader);
-
             this.stats.drawCalls++;
             this.stats.vertices += mesh.vertexCount;
         }

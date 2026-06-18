@@ -22,7 +22,9 @@ window.onload = () => {
     ];
 
     const blockSize = 2.0;
-    const wallHeight = 3.0; // Paredes altas dão sensação de claustrofobia
+    const wallHeight = 3.0; // Paredes altas
+
+    engine.camera.setCollisionMap(mapLayout, blockSize);
 
     // Lendo a matriz e construindo a caverna
     for (let z = 0; z < mapLayout.length; z++) {
@@ -60,8 +62,11 @@ window.onload = () => {
     const goldBarMesh = Mesh.createGoldBar(gl, 1.0, 2.0, 0.5, 0.6);
     goldBarMesh.setupBuffers(); 
     goldBarMesh.transform = new Transform();
-    // Coloca a barra numa posição livre do mapa (ex: x=3, z=3)
     goldBarMesh.transform.setPosition(3 * blockSize, 0.0, 3 * blockSize); 
+    
+    // ADICIONE ESTA LINHA:
+    goldBarMesh.transform.setScale(0.3, 0.3, 0.3); // Deixa ela com 30% do tamanho original
+    
     engine.meshes.push(goldBarMesh);
 
     // --- 4. O CHÃO GIGANTE ---

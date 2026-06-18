@@ -1,8 +1,3 @@
-/**
- * Camera.js
- * Câmera em Primeira Pessoa (FPS)
- */
-
 import { vec3, mat4 } from 'gl-matrix';
 import { input } from '../utils/Input.js';
 
@@ -10,44 +5,73 @@ export class Camera {
     constructor(canvas) {
         this.canvas = canvas;
         
-        // Posição inicial
-        this.position = vec3.fromValues(0, 1.5, 5); // 1.5 de altura (altura dos olhos)
+        this.position = vec3.fromValues(0, 1.5, 5); 
         this.up = vec3.fromValues(0, 1, 0);
         this.front = vec3.fromValues(0, 0, -1);
 
-        // Ângulos de rotação (yaw, pitch)
-        this.yaw = -90.0; // Começa olhando para o eixo -Z
+        this.yaw = -90.0; 
         this.pitch = 0.0;
 
-        // Propriedades
-        this.fov = 45.0 * Math.PI / 180.0; // Converte para radianos
+        this.fov = 45.0 * Math.PI / 180.0; 
         this.near = 0.1;
         this.far = 1000.0;
 
-        this.speed = 5.0; // Unidades por segundo
-        this.sensitivity = 0.1; // Sensibilidade do mouse
+        this.speed = 5.0; 
+        this.sensitivity = 0.1; 
 
         this.viewMatrix = mat4.create();
         this.projMatrix = mat4.create();
+
+        this.walkTime = 0.0; // Para o Head Bobbing
+        
+        // Para a Colisão
+        this.mapLayout = null;
+        this.blockSize = 1.0;
 
         this.updateProjectionMatrix();
         this.updateCameraVectors();
     }
 
+    // Recebe o mapa do main.js
+    setCollisionMap(layout, blockSize) {
+        this.mapLayout = layout;
+        this.blockSize = blockSize;
+    }
+
+    // Verifica se a coordenada (x, z) é uma parede
+    isWall(x, z) {
+        if (!this.mapLayout) return false;
+
+        // Converte as coordenadas do mundo 3D para índices da matriz
+        const col = Math.round(x / this.blockSize);
+        const row = Math.round(z / this.blockSize);
+
+        // Se tentar sair dos limites do mapa, bloqueia (trata como parede)
+        if (row < 0 || row >= this.mapLayout.length || col < 0 || col >= this.mapLayout[0].length) {
+            return true;
+        }
+
+        // Retorna true se for parede (1)
+        return this.mapLayout[row][col] === 1;
+    }
+
     updateCameraVectors() {
-        // Calcula a nova direção baseada no Yaw e Pitch
         const front = vec3.create();
         front[0] = Math.cos(this.yaw * Math.PI / 180) * Math.cos(this.pitch * Math.PI / 180);
         front[1] = Math.sin(this.pitch * Math.PI / 180);
         front[2] = Math.sin(this.yaw * Math.PI / 180) * Math.cos(this.pitch * Math.PI / 180);
-        
         vec3.normalize(this.front, front);
     }
 
     updateViewMatrix() {
         const target = vec3.create();
-        vec3.add(target, this.position, this.front);
-        mat4.lookAt(this.viewMatrix, this.position, target, this.up);
+        const visualPosition = vec3.clone(this.position);
+        
+        // Head Bobbing (Sobe e desce a câmera ao andar)
+        visualPosition[1] += Math.sin(this.walkTime * 10.0) * 0.05; 
+
+        vec3.add(target, visualPosition, this.front);
+        mat4.lookAt(this.viewMatrix, visualPosition, target, this.up);
     }
 
     updateProjectionMatrix() {
@@ -57,48 +81,73 @@ export class Camera {
 
     update(deltaTime) {
         let currentSpeed = this.speed * deltaTime;
-        if (input.isKeyPressed('shift')) currentSpeed *= 2; // Correr
+        let isMoving = false;
 
-        // Vetor Right (Direita) para andar de lado (Strafe)
+        if (input.isKeyPressed('shift')) currentSpeed *= 2; 
+
         const right = vec3.create();
         vec3.cross(right, this.front, this.up);
         vec3.normalize(right, right);
 
-        // Vetor "flatFront" (Frente achatada). 
-        // Pega a direção que estamos olhando, mas zera a inclinação (Y = 0).
-        // Isso impede que o jogador voe ou entre no chão ao olhar para cima/baixo.
         const flatFront = vec3.fromValues(this.front[0], 0, this.front[2]);
         vec3.normalize(flatFront, flatFront);
 
-        // Movimento WASD (usando flatFront ao invés de this.front)
+        // Vetor final de movimento neste frame
+        const move = vec3.create();
+
         if (input.isKeyPressed('w')) {
-            const move = vec3.create();
-            vec3.scale(move, flatFront, currentSpeed);
-            vec3.add(this.position, this.position, move);
+            const temp = vec3.create();
+            vec3.scale(temp, flatFront, currentSpeed);
+            vec3.add(move, move, temp);
+            isMoving = true;
         }
         if (input.isKeyPressed('s')) {
-            const move = vec3.create();
-            vec3.scale(move, flatFront, currentSpeed);
-            vec3.sub(this.position, this.position, move);
+            const temp = vec3.create();
+            vec3.scale(temp, flatFront, currentSpeed);
+            vec3.sub(move, move, temp);
+            isMoving = true;
         }
         if (input.isKeyPressed('d')) {
-            const move = vec3.create();
-            vec3.scale(move, right, currentSpeed);
-            vec3.add(this.position, this.position, move);
+            const temp = vec3.create();
+            vec3.scale(temp, right, currentSpeed);
+            vec3.add(move, move, temp);
+            isMoving = true;
         }
         if (input.isKeyPressed('a')) {
-            const move = vec3.create();
-            vec3.scale(move, right, currentSpeed);
-            vec3.sub(this.position, this.position, move);
+            const temp = vec3.create();
+            vec3.scale(temp, right, currentSpeed);
+            vec3.sub(move, move, temp);
+            isMoving = true;
         }
 
-        // Controle de mouse (Olhar)
+        // --- SISTEMA DE COLISÃO DESLIZANTE ---
+        // Checamos o Eixo X e o Eixo Z separadamente para o jogador "deslizar" na parede
+        
+        // Eixo X: Posição futura X, posição atual Z
+        const nextX = this.position[0] + move[0];
+        if (!this.isWall(nextX, this.position[2])) {
+            this.position[0] = nextX;
+        }
+
+        // Eixo Z: Posição atual X, posição futura Z
+        const nextZ = this.position[2] + move[2];
+        if (!this.isWall(this.position[0], nextZ)) {
+            this.position[2] = nextZ;
+        }
+
+        // Head Bobbing Timer
+        if (isMoving) {
+            this.walkTime += deltaTime;
+        } else {
+            this.walkTime = 0; 
+        }
+
+        // Mouse Look
         const delta = input.getMouseDelta();
         if (delta.x !== 0 || delta.y !== 0) {
             this.yaw += delta.x * this.sensitivity;
             this.pitch -= delta.y * this.sensitivity;
 
-            // Limitar o pitch (não quebrar o pescoço)
             if (this.pitch > 89.0) this.pitch = 89.0;
             if (this.pitch < -89.0) this.pitch = -89.0;
 
