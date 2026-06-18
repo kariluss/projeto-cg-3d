@@ -68,7 +68,6 @@ export class WebGLEngine {
             vNormal = mat3(transpose(inverse(uModel))) * aNormal;
             vColor = aColor;
             vTexCoord = aTexCoord;
-            
             gl_Position = uProjection * uView * vec4(vFragPos, 1.0);
         }
         `;
@@ -81,50 +80,116 @@ export class WebGLEngine {
         in vec3 vFragPos;
         in vec2 vTexCoord;
 
-        // Variaveis de Iluminação (Posição do Player e Direção do Olhar)
-        uniform vec3 uViewPos;  
-        uniform vec3 uFront;    
+        uniform vec3 uViewPos;       
+        uniform vec3 uFlashlightPos; 
+        uniform vec3 uFront;         
 
         out vec4 FragColor;
 
         void main() {
-            // 1. Ambiente (Global)
-            vec3 ambient = vec3(0.05, 0.05, 0.08) * vColor;
-            
             vec3 norm = normalize(vNormal);
-            vec3 lightDir = normalize(uViewPos - vFragPos); 
             vec3 viewDir = normalize(uViewPos - vFragPos);
-            float dist = length(uViewPos - vFragPos);
 
-            // 2. Pontual (Glow do Player)
-            float attenPoint = 1.0 / (1.0 + 0.14 * dist + 0.07 * (dist * dist));
-            float diffPoint = max(dot(norm, lightDir), 0.0);
-            vec3 glowColor = vec3(0.3, 0.3, 0.3); 
-            vec3 diffusePoint = diffPoint * glowColor * vColor * attenPoint;
+            // 1. LUZ AMBIENTE GLOBAL
+            // Breu absoluto não existe, deixamos um "fundo" levemente visível
+            vec3 ambient = vec3(0.04, 0.04, 0.06) * vColor;
 
-            // 3. Spotlight (Lanterna)
+            // 2. AURA DO JOGADOR (Proximity Glow - O Segredo da Correção!)
+            // Ignoramos a "normal" da parede aqui. Se está perto, ganha luz.
+            // Isso simula a luz da lanterna rebatendo na sua roupa e iluminando ao redor.
+            float distToBody = length(uViewPos - vFragPos);
+            // Atenuação curta (morre rápido pra não clarear o mapa todo)
+            float attenGlow = 1.0 / (1.0 + 0.6 * distToBody + 0.4 * (distToBody * distToBody));
+            
+            vec3 glowColor = vec3(0.3, 0.3, 0.3); // Luz branca/cinza bem suave
+            vec3 proximityGlow = glowColor * vColor * attenGlow;
+
+            // 3. A LANTERNA DA MÃO (Spotlight Direcional)
+            vec3 lightDir = normalize(uFlashlightPos - vFragPos);
+            float distToFlashlight = length(uFlashlightPos - vFragPos);
+            
             float theta = dot(normalize(-lightDir), normalize(uFront));
-            float cutOff = cos(radians(12.5));
-            float outerCutOff = cos(radians(17.5));
+            float cutOff = cos(radians(15.0)); 
+            float outerCutOff = cos(radians(24.0)); // Aumentei o esfumaçado da borda
             float epsilon = cutOff - outerCutOff;
             float intensity = clamp((theta - outerCutOff) / epsilon, 0.0, 1.0);
 
-            float attenSpot = 1.0 / (1.0 + 0.045 * dist + 0.0075 * (dist * dist));
-            float diffSpot = max(dot(norm, lightDir), 0.0);
-            vec3 flashColor = vec3(1.0, 0.9, 0.7) * 2.0; 
+            // Atenuação da lanterna vai mais longe
+            float attenSpot = 1.0 / (1.0 + 0.045 * distToFlashlight + 0.0075 * (distToFlashlight * distToFlashlight));
             
+            // A lanterna SIM respeita as quinas (dot product) para criar o visual 3D
+            float diffSpot = max(dot(norm, lightDir), 0.0);
+            
+            vec3 flashColor = vec3(1.0, 0.85, 0.6) * 1.8; 
             vec3 diffuseSpot = diffSpot * flashColor * vColor * intensity * attenSpot;
 
+            // Reflexo Especular
             vec3 reflectDir = reflect(-lightDir, norm);  
             float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-            vec3 specularSpot = spec * flashColor * 0.6 * intensity * attenSpot;
+            vec3 specularSpot = spec * flashColor * 0.4 * intensity * attenSpot;
 
-            vec3 result = ambient + diffusePoint + diffuseSpot + specularSpot;
+            // A SOMA DE TODAS AS LUZES
+            vec3 result = ambient + proximityGlow + diffuseSpot + specularSpot;
             FragColor = vec4(result, 1.0);
         }
         `;
 
         this.shader = Shader.fromStrings(this.gl, vertexShader, fragmentShader);
+    }
+
+    render(meshes, deltaTime) {
+        this.camera.update(deltaTime);
+        this.clear();
+        this.stats.drawCalls = 0;
+        this.stats.vertices = 0;
+
+        this.shader.use();
+
+        const viewMatrix = this.camera.getViewMatrix();
+        const projMatrix = this.camera.getProjectionMatrix();
+
+        this.shader.setUniformArray('uView', viewMatrix);
+        this.shader.setUniformArray('uProjection', projMatrix);
+
+        // --- CÁLCULO DA POSIÇÃO DA MÃO (LANTERNA) ---
+        const camPos = this.camera.getPosition(); 
+        const camFront = this.camera.front; 
+        
+        // Vamos calcular o vetor "Direita" e "Baixo" da câmera
+        const right = [0, 0, 0];
+        // Importando a matemática nativa só pra essa continha rápida
+        const up = [0, 1, 0];
+        // Cross product (Frente x Cima = Direita)
+        right[0] = camFront[1]*up[2] - camFront[2]*up[1];
+        right[1] = camFront[2]*up[0] - camFront[0]*up[2];
+        right[2] = camFront[0]*up[1] - camFront[1]*up[0];
+        
+        // Normaliza o Right
+        const rLen = Math.sqrt(right[0]*right[0] + right[1]*right[1] + right[2]*right[2]);
+        right[0]/=rLen; right[1]/=rLen; right[2]/=rLen;
+
+        // Posição da Lanterna: Camera + (0.5 pra direita) + (-0.3 pra baixo)
+        const flashPos = [
+            camPos[0] + (right[0] * 0.4),
+            camPos[1] - 0.3,
+            camPos[2] + (right[2] * 0.4)
+        ];
+
+        if (this.shader.setUniform3f) {
+            this.shader.setUniform3f('uViewPos', camPos[0], camPos[1], camPos[2]);
+            this.shader.setUniform3f('uFlashlightPos', flashPos[0], flashPos[1], flashPos[2]);
+            this.shader.setUniform3f('uFront', camFront[0], camFront[1], camFront[2]);
+        }
+
+        for (const mesh of meshes) {
+            if (mesh.transform) {
+                const modelMatrix = mesh.transform.getModelMatrix();
+                this.shader.setUniformArray('uModel', modelMatrix);
+            }
+            mesh.draw(this.shader);
+            this.stats.drawCalls++;
+            this.stats.vertices += mesh.vertexCount;
+        }
     }
 
     setupEventListeners() {
@@ -147,40 +212,6 @@ export class WebGLEngine {
 
     clear() {
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-    }
-
-    render(meshes, deltaTime) {
-        this.camera.update(deltaTime);
-        this.clear();
-        this.stats.drawCalls = 0;
-        this.stats.vertices = 0;
-
-        this.shader.use();
-
-        const viewMatrix = this.camera.getViewMatrix();
-        const projMatrix = this.camera.getProjectionMatrix();
-
-        this.shader.setUniformArray('uView', viewMatrix);
-        this.shader.setUniformArray('uProjection', projMatrix);
-
-        const camPos = this.camera.getPosition ? this.camera.getPosition() : [0, 0, 0]; 
-        const camFront = this.camera.front; 
-        
-        if (this.shader.setUniform3f) {
-            this.shader.setUniform3f('uViewPos', camPos[0], camPos[1], camPos[2]);
-            this.shader.setUniform3f('uFront', camFront[0], camFront[1], camFront[2]);
-            // REPARE QUE AQUI NÃO TEM MAIS O uLightPos! 
-        }
-
-        for (const mesh of meshes) {
-            if (mesh.transform) {
-                const modelMatrix = mesh.transform.getModelMatrix();
-                this.shader.setUniformArray('uModel', modelMatrix);
-            }
-            mesh.draw(this.shader);
-            this.stats.drawCalls++;
-            this.stats.vertices += mesh.vertexCount;
-        }
     }
 
     setShader(shader) {

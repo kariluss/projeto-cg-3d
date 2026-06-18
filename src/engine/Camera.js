@@ -87,9 +87,7 @@ export class Camera {
 
     update(deltaTime) {
         let currentSpeed = this.speed * deltaTime;
-        let isMoving = false;
-
-        if (input.isKeyPressed('shift')) currentSpeed *= 2; 
+        if (input.isKeyPressed('shift')) currentSpeed *= 2;
 
         const right = vec3.create();
         vec3.cross(right, this.front, this.up);
@@ -98,34 +96,37 @@ export class Camera {
         const flatFront = vec3.fromValues(this.front[0], 0, this.front[2]);
         vec3.normalize(flatFront, flatFront);
 
+        // Variáveis para somar a intenção de movimento
+        let moveDirFront = 0;
+        let moveDirRight = 0;
+
+        if (input.isKeyPressed('w')) moveDirFront += 1;
+        if (input.isKeyPressed('s')) moveDirFront -= 1;
+        if (input.isKeyPressed('d')) moveDirRight += 1;
+        if (input.isKeyPressed('a')) moveDirRight -= 1;
+
+        let isMoving = (moveDirFront !== 0 || moveDirRight !== 0);
         const move = vec3.create();
 
-        if (input.isKeyPressed('w')) {
-            const temp = vec3.create();
-            vec3.scale(temp, flatFront, currentSpeed);
-            vec3.add(move, move, temp);
-            isMoving = true;
-        }
-        if (input.isKeyPressed('s')) {
-            const temp = vec3.create();
-            vec3.scale(temp, flatFront, currentSpeed);
-            vec3.sub(move, move, temp);
-            isMoving = true;
-        }
-        if (input.isKeyPressed('d')) {
-            const temp = vec3.create();
-            vec3.scale(temp, right, currentSpeed);
-            vec3.add(move, move, temp);
-            isMoving = true;
-        }
-        if (input.isKeyPressed('a')) {
-            const temp = vec3.create();
-            vec3.scale(temp, right, currentSpeed);
-            vec3.sub(move, move, temp);
-            isMoving = true;
+        if (isMoving) {
+            // "Penalidade" de andar de lado (Strafe é 60% da velocidade)
+            moveDirRight *= 0.6; 
+
+            // Junta os dois movimentos
+            const tempFront = vec3.create();
+            const tempRight = vec3.create();
+            vec3.scale(tempFront, flatFront, moveDirFront);
+            vec3.scale(tempRight, right, moveDirRight);
+            
+            vec3.add(move, tempFront, tempRight);
+
+            // NORMALIZAÇÃO: Evita que a diagonal seja mais rápida que andar reto
+            vec3.normalize(move, move);
+            vec3.scale(move, move, currentSpeed);
         }
 
         // --- SISTEMA DE COLISÃO DESLIZANTE COM RAIO ---
+        // (O resto do código continua igual...)
         const nextX = this.position[0] + move[0];
         if (!this.checkCollision(nextX, this.position[2])) {
             this.position[0] = nextX;
@@ -136,6 +137,7 @@ export class Camera {
             this.position[2] = nextZ;
         }
 
+        // Head Bobbing Timer
         if (isMoving) {
             this.walkTime += deltaTime;
         } else {
