@@ -20,18 +20,10 @@ window.onload = () => {
     engine.meshes.push(goldBarMesh);
 
     // --- 2. CRIANDO O CHÃO DA CAVERNA ---
-    const floorMesh = Mesh.createPlane(gl, 40, 40); // Um chão bem grande (40x40)
-    
-    // Pintando o chão de marrom/cinza escuro (estilo terra) antes de mandar pra GPU
-    const groundColor = [0.3, 0.25, 0.2];
-    floorMesh.colors = [];
-    for(let i = 0; i < 4; i++) { // Um plano tem 4 vértices
-        floorMesh.colors.push(...groundColor);
-    }
-    
-    floorMesh.setupBuffers(); // Envia pra Placa de Vídeo
+    const floorMesh = Mesh.createPlane(gl, 40, 40); 
+    floorMesh.setupBuffers(); 
     floorMesh.transform = new Transform();
-    floorMesh.transform.setPosition(0, -1.0, 0); // Coloca embaixo do pé do jogador
+    floorMesh.transform.setPosition(0, -1.0, 0); 
     engine.meshes.push(floorMesh);
 
     let lastTime = performance.now();

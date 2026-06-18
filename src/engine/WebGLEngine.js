@@ -55,14 +55,13 @@ export class WebGLEngine {
     }
 
     setupDefaultShader() {
-        // Vertex Shader: Aplica transformações e envia dados pro Fragment Shader
         const vertexShader = `#version 300 es
         precision highp float;
 
         in vec3 aPosition;
         in vec3 aNormal;
         in vec3 aColor;
-        in vec2 aTexCoord; // Suporte futuro para paredes
+        in vec2 aTexCoord;
 
         uniform mat4 uModel;
         uniform mat4 uView;
@@ -75,7 +74,6 @@ export class WebGLEngine {
 
         void main() {
             vFragPos = vec3(uModel * vec4(aPosition, 1.0));
-            // Calcula normal em world space
             vNormal = mat3(transpose(inverse(uModel))) * aNormal;
             vColor = aColor;
             vTexCoord = aTexCoord;
@@ -84,7 +82,6 @@ export class WebGLEngine {
         }
         `;
 
-        // Fragment Shader: Modelo de Phong Completo + Atenuação
         const fragmentShader = `#version 300 es
         precision highp float;
 
@@ -93,44 +90,40 @@ export class WebGLEngine {
         in vec3 vFragPos;
         in vec2 vTexCoord;
 
-        // Variáveis Dinâmicas de Luz e Câmera
         uniform vec3 uViewPos;  
         uniform vec3 uLightPos; 
 
         out vec4 FragColor;
 
         void main() {
-            // 1. Ambiente (Caverna escura)
+            // 1. Ambiente
             float ambientStrength = 0.15;
             vec3 ambient = ambientStrength * vColor;
             
-            // 2. Difusa (A luz batendo no objeto)
+            // 2. Difusa
             vec3 norm = normalize(vNormal);
             vec3 lightDir = normalize(uLightPos - vFragPos);
             float diff = max(dot(norm, lightDir), 0.0);
             
-            // Cor da luz levemente alaranjada (Tocha/Lanterna de exploração)
-            vec3 lightColor = vec3(1.0, 0.9, 0.7); 
+            // Cor da luz (Laranja forte)
+            vec3 lightColor = vec3(1.0, 0.9, 0.7) * 2.0; 
             vec3 diffuse = diff * lightColor * vColor;
             
-            // 3. Especular (Brilho do material, como no ouro)
+            // 3. Especular
             float specularStrength = 0.6;
             vec3 viewDir = normalize(uViewPos - vFragPos);
             vec3 reflectDir = reflect(-lightDir, norm);  
-            float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0); // 32 = Shininess
+            float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
             vec3 specular = specularStrength * spec * lightColor;
             
-            // 4. Atenuação Atmosférica (A luz enfraquece com a distância)
-            // Fórmula padrão: 1.0 / (constante + linear * d + quadratica * d^2)
-            float distance = length(uLightPos - vFragPos);
-            float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * (distance * distance));
+            // 4. Atenuação (Usando lightDist ao invés de distance para evitar erro GLSL)
+            float lightDist = length(uLightPos - vFragPos);
+            float atten = 1.0 / (1.0 + 0.045 * lightDist + 0.0075 * (lightDist * lightDist));
             
-            // Aplica a atenuação em todas as componentes de luz
-            ambient  *= attenuation;
-            diffuse  *= attenuation;
-            specular *= attenuation;
+            ambient  *= atten;
+            diffuse  *= atten;
+            specular *= atten;
 
-            // Resultado Final do PHONG
             vec3 result = ambient + diffuse + specular;
             FragColor = vec4(result, 1.0);
         }

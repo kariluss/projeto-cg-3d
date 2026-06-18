@@ -218,11 +218,17 @@ export class Mesh {
             0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
         ];
 
+        // Deixando o chão cinza claro para refletir bem a luz
         mesh.colors = [
-            1, 1, 1,  1, 1, 1,  1, 1, 1,  1, 1, 1,
+            0.6, 0.6, 0.6,   0.6, 0.6, 0.6,   
+            0.6, 0.6, 0.6,   0.6, 0.6, 0.6,
         ];
 
-        // Ordem Anti-Horária (CCW) para o WebGL não ignorar a face (Culling)
+        // Mapeamento UV (Para textura futura)
+        mesh.texCoords = [
+            0, 0,   1, 0,   1, 1,   0, 1
+        ];
+
         mesh.indices = [0, 1, 2, 0, 2, 3];
 
         return mesh;
