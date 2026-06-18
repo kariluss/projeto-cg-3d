@@ -1,6 +1,6 @@
 /**
  * Mesh
- * Representa uma geometria 3D com vértices, normais e índices
+ * Representa uma geometria 3D com vértices, normais, cores, índices e coordenadas de textura
  */
 
 export class Mesh {
@@ -9,12 +9,15 @@ export class Mesh {
         this.positions = [];
         this.normals = [];
         this.colors = [];
+        this.texCoords = [];
         this.indices = [];
 
         this.vao = null;
         this.vbo = {};
         this.ebo = null;
         this.vertexCount = 0;
+        
+        this.transform = null; // Para referência futura de posicionamento no mundo
     }
 
     setupBuffers() {
@@ -41,6 +44,13 @@ export class Mesh {
             this.vbo.color = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo.color);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colors), gl.STATIC_DRAW);
+        }
+
+        // VBO para texturas (UVs)
+        if (this.texCoords.length > 0) {
+            this.vbo.texCoord = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo.texCoord);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texCoords), gl.STATIC_DRAW);
         }
 
         // EBO para índices
@@ -90,6 +100,16 @@ export class Mesh {
                 3, gl.FLOAT, false, 0, 0
             );
         }
+
+        // Ativar atributo de textura
+        if (this.vbo.texCoord && shader.attributes['aTexCoord']) {
+            gl.enableVertexAttribArray(shader.attributes['aTexCoord'].location);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo.texCoord);
+            gl.vertexAttribPointer(
+                shader.attributes['aTexCoord'].location,
+                2, gl.FLOAT, false, 0, 0
+            );
+        }
     }
 
     draw(shader) {
@@ -104,12 +124,12 @@ export class Mesh {
         }
     }
 
-    static createCube(size = 1) {
-        const mesh = new Mesh(null); // GL context será setado depois
+    // --- Geometrias Geradas Programaticamente ---
 
+    static createCube(gl, size = 1) {
+        const mesh = new Mesh(gl);
         const s = size / 2;
 
-        // Posições dos vértices
         mesh.positions = [
             // Front
             -s, -s, s,  s, -s, s,  s, s, s,  -s, s, s,
@@ -125,7 +145,6 @@ export class Mesh {
             -s, -s, -s,  -s, -s, s,  -s, s, s,  -s, s, -s,
         ];
 
-        // Normais
         mesh.normals = [
             // Front
             0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
@@ -141,23 +160,16 @@ export class Mesh {
             -1, 0, 0,  -1, 0, 0,  -1, 0, 0,  -1, 0, 0,
         ];
 
-        // Cores (RGB)
         mesh.colors = [
-            // Front (Vermelho)
-            1, 0, 0,  1, 0, 0,  1, 0, 0,  1, 0, 0,
-            // Back (Verde)
-            0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
-            // Top (Azul)
-            0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
-            // Bottom (Amarelo)
-            1, 1, 0,  1, 1, 0,  1, 1, 0,  1, 1, 0,
-            // Right (Magenta)
-            1, 0, 1,  1, 0, 1,  1, 0, 1,  1, 0, 1,
-            // Left (Cyan)
-            0, 1, 1,  0, 1, 1,  0, 1, 1,  0, 1, 1,
+            // Cor sólida para todas as faces (Cinza claro, pode ser alterado depois)
+            0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,
+            0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,
+            0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,
+            0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,
+            0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,
+            0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,  0.8, 0.8, 0.8,
         ];
 
-        // Índices
         mesh.indices = [
             0, 1, 2,  0, 2, 3,    // Front
             4, 5, 6,  4, 6, 7,    // Back
@@ -170,31 +182,65 @@ export class Mesh {
         return mesh;
     }
 
-    static createPlane(width = 1, height = 1) {
-        const mesh = new Mesh(null);
+    // Gerador de Barra de Ouro (Cor Sólida / Forma Geométrica)
+    static createGoldBar(gl, baseWidth = 1.0, baseLength = 2.0, height = 0.5, topScale = 0.6) {
+        const mesh = new Mesh(gl);
+        
+        const bw = baseWidth / 2;
+        const bl = baseLength / 2;
+        const tw = bw * topScale;
+        const tl = bl * topScale;
+        const h = height / 2;
 
+        mesh.positions = [
+            // Topo
+            -tw, h, tl,  tw, h, tl,  tw, h, -tl,  -tw, h, -tl,
+            // Base
+            -bw, -h, bl,  bw, -h, bl,  bw, -h, -bl,  -bw, -h, -bl,
+            // Frente
+            -bw, -h, bl,  bw, -h, bl,  tw, h, tl,  -tw, h, tl,
+            // Trás
+            bw, -h, -bl,  -bw, -h, -bl,  -tw, h, -tl,  tw, h, -tl,
+            // Direita
+            bw, -h, bl,  bw, -h, -bl,  tw, h, -tl,  tw, h, tl,
+            // Esquerda
+            -bw, -h, -bl,  -bw, -h, bl,  -tw, h, tl,  -tw, h, -tl
+        ];
+
+        // Dourado
+        const gold = [1.0, 0.843, 0.0]; 
+        mesh.colors = [];
+        for(let i = 0; i < 24; i++) mesh.colors.push(...gold);
+
+        mesh.normals = Mesh.createCube(gl, 1).normals; // Lembre-se de passar 'gl' pro cubo também
+
+        mesh.indices = [
+            0, 1, 2,  0, 2, 3,       // Topo
+            4, 5, 6,  4, 6, 7,       // Base
+            8, 9, 10,  8, 10, 11,    // Frente
+            12, 13, 14,  12, 14, 15, // Trás
+            16, 17, 18,  16, 18, 19, // Direita
+            20, 21, 22,  20, 22, 23  // Esquerda
+        ];
+
+        return mesh;
+    }
+
+    static createPlane(gl, width = 1, height = 1) {
+        const mesh = new Mesh(gl);
         const w = width / 2;
         const h = height / 2;
 
         mesh.positions = [
-            -w, 0, -h,
-            w, 0, -h,
-            w, 0, h,
-            -w, 0, h,
+            -w, 0, -h,  w, 0, -h,  w, 0, h,  -w, 0, h,
         ];
 
         mesh.normals = [
-            0, 1, 0,
-            0, 1, 0,
-            0, 1, 0,
-            0, 1, 0,
+            0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
         ];
 
         mesh.colors = [
-            1, 1, 1,
-            1, 1, 1,
-            1, 1, 1,
-            1, 1, 1,
+            1, 1, 1,  1, 1, 1,  1, 1, 1,  1, 1, 1,
         ];
 
         mesh.indices = [0, 1, 2, 0, 2, 3];
@@ -202,53 +248,11 @@ export class Mesh {
         return mesh;
     }
 
-    static createSphere(radius = 1, segments = 32, rings = 16) {
-        const mesh = new Mesh(null);
-
-        for (let i = 0; i <= rings; i++) {
-            const phi = Math.PI * i / rings;
-            const sinPhi = Math.sin(phi);
-            const cosPhi = Math.cos(phi);
-
-            for (let j = 0; j <= segments; j++) {
-                const theta = 2 * Math.PI * j / segments;
-                const sinTheta = Math.sin(theta);
-                const cosTheta = Math.cos(theta);
-
-                const x = cosTheta * sinPhi;
-                const y = cosPhi;
-                const z = sinTheta * sinPhi;
-
-                mesh.positions.push(x * radius, y * radius, z * radius);
-                mesh.normals.push(x, y, z);
-                mesh.colors.push(
-                    (x + 1) / 2,
-                    (y + 1) / 2,
-                    (z + 1) / 2
-                );
-            }
-        }
-
-        for (let i = 0; i < rings; i++) {
-            for (let j = 0; j < segments; j++) {
-                const a = i * (segments + 1) + j;
-                const b = a + segments + 1;
-
-                mesh.indices.push(a, b, a + 1);
-                mesh.indices.push(b, b + 1, a + 1);
-            }
-        }
-
-        return mesh;
-    }
-
     delete() {
         const gl = this.gl;
-
         Object.values(this.vbo).forEach(vbo => {
             if (vbo) gl.deleteBuffer(vbo);
         });
-
         if (this.ebo) gl.deleteBuffer(this.ebo);
         if (this.vao) gl.deleteVertexArray(this.vao);
     }
