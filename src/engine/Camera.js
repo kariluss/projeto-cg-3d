@@ -22,37 +22,44 @@ export class Camera {
         this.viewMatrix = mat4.create();
         this.projMatrix = mat4.create();
 
-        this.walkTime = 0.0; // Para o Head Bobbing
+        this.walkTime = 0.0; 
         
-        // Para a Colisão
+        // --- SISTEMA DE COLISÃO ---
         this.mapLayout = null;
         this.blockSize = 1.0;
+        this.radius = 0.4; // O "tamanho" da barriga do jogador (Threshold)
 
         this.updateProjectionMatrix();
         this.updateCameraVectors();
     }
 
-    // Recebe o mapa do main.js
     setCollisionMap(layout, blockSize) {
         this.mapLayout = layout;
         this.blockSize = blockSize;
     }
 
-    // Verifica se a coordenada (x, z) é uma parede
+    // Verifica se um ponto exato é parede
     isWall(x, z) {
         if (!this.mapLayout) return false;
 
-        // Converte as coordenadas do mundo 3D para índices da matriz
         const col = Math.round(x / this.blockSize);
         const row = Math.round(z / this.blockSize);
 
-        // Se tentar sair dos limites do mapa, bloqueia (trata como parede)
         if (row < 0 || row >= this.mapLayout.length || col < 0 || col >= this.mapLayout[0].length) {
             return true;
         }
 
-        // Retorna true se for parede (1)
         return this.mapLayout[row][col] === 1;
+    }
+
+    // Verifica se a Hitbox (Raio) do jogador está batendo na parede
+    checkCollision(x, z) {
+        const r = this.radius;
+        // Checamos os 4 cantos ao redor do jogador
+        return this.isWall(x - r, z - r) ||
+               this.isWall(x + r, z - r) ||
+               this.isWall(x - r, z + r) ||
+               this.isWall(x + r, z + r);
     }
 
     updateCameraVectors() {
@@ -67,7 +74,6 @@ export class Camera {
         const target = vec3.create();
         const visualPosition = vec3.clone(this.position);
         
-        // Head Bobbing (Sobe e desce a câmera ao andar)
         visualPosition[1] += Math.sin(this.walkTime * 10.0) * 0.05; 
 
         vec3.add(target, visualPosition, this.front);
@@ -92,7 +98,6 @@ export class Camera {
         const flatFront = vec3.fromValues(this.front[0], 0, this.front[2]);
         vec3.normalize(flatFront, flatFront);
 
-        // Vetor final de movimento neste frame
         const move = vec3.create();
 
         if (input.isKeyPressed('w')) {
@@ -120,29 +125,23 @@ export class Camera {
             isMoving = true;
         }
 
-        // --- SISTEMA DE COLISÃO DESLIZANTE ---
-        // Checamos o Eixo X e o Eixo Z separadamente para o jogador "deslizar" na parede
-        
-        // Eixo X: Posição futura X, posição atual Z
+        // --- SISTEMA DE COLISÃO DESLIZANTE COM RAIO ---
         const nextX = this.position[0] + move[0];
-        if (!this.isWall(nextX, this.position[2])) {
+        if (!this.checkCollision(nextX, this.position[2])) {
             this.position[0] = nextX;
         }
 
-        // Eixo Z: Posição atual X, posição futura Z
         const nextZ = this.position[2] + move[2];
-        if (!this.isWall(this.position[0], nextZ)) {
+        if (!this.checkCollision(this.position[0], nextZ)) {
             this.position[2] = nextZ;
         }
 
-        // Head Bobbing Timer
         if (isMoving) {
             this.walkTime += deltaTime;
         } else {
             this.walkTime = 0; 
         }
 
-        // Mouse Look
         const delta = input.getMouseDelta();
         if (delta.x !== 0 || delta.y !== 0) {
             this.yaw += delta.x * this.sensitivity;
