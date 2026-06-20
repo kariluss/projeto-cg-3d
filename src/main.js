@@ -2,6 +2,7 @@ import { WebGLEngine } from './engine/WebGLEngine.js';
 import { Mesh } from './engine/Mesh.js';
 import { Transform } from './engine/Transform.js';
 import { input } from './utils/Input.js';
+import { Texture } from './engine/Texture.js';
 
 window.onload = () => {
     const canvas = document.getElementById('gameCanvas');
@@ -10,7 +11,7 @@ window.onload = () => {
     const gl = engine.getContext();
 
     // --- 1. O MAPA DO LABIRINTO (1 = Parede, 0 = Caminho) ---
-    // Pense que cada bloco tem tamanho 2x2.
+    // like minecraft rs :)
     const mapLayout = [
         [1, 1, 1, 1, 1, 1, 1],
         [1, 0, 0, 0, 0, 0, 1],
@@ -26,16 +27,18 @@ window.onload = () => {
 
     engine.camera.setCollisionMap(mapLayout, blockSize);
 
+    const wallTex = new Texture(gl);
+    // Substitua pelo caminho do seu arquivo diff_4k reduzido
+    wallTex.load('./assets/rock_boulder_cracked_diff_4k.jpg');
+
     // Lendo a matriz e construindo a caverna
     for (let z = 0; z < mapLayout.length; z++) {
         for (let x = 0; x < mapLayout[z].length; x++) {
             if (mapLayout[z][x] === 1) {
                 // Cria um cubo
                 const wall = Mesh.createCube(gl, 1.0);
-                
-                // Pinta a parede de cinza bem escuro
-                wall.colors = [];
-                for(let i=0; i<36; i++) wall.colors.push(0.4, 0.4, 0.45);
+
+                wall.texture = wallTex;
                 
                 wall.setupBuffers();
                 wall.transform = new Transform();
@@ -63,24 +66,70 @@ window.onload = () => {
     goldBarMesh.setupBuffers(); 
     goldBarMesh.transform = new Transform();
     goldBarMesh.transform.setPosition(3 * blockSize, 0.0, 3 * blockSize); 
-    
-    // ADICIONE ESTA LINHA:
-    goldBarMesh.transform.setScale(0.3, 0.3, 0.3); // Deixa ela com 30% do tamanho original
-    
+    goldBarMesh.transform.setScale(0.3, 0.3, 0.3);
     engine.meshes.push(goldBarMesh);
 
-    // --- 4. O CHÃO GIGANTE ---
-    const floorMesh = Mesh.createPlane(gl, 50, 50); 
+
+    // =========================================================================
+    // --- 4. CÁLCULO DINÂMICO PARA O CHÃO E TETO ---
+    // =========================================================================
+    
+    // Descobrimos o tamanho real do labirinto baseando-se na matriz
+    const mapRows = mapLayout.length;         // Eixo Z (Comprimento)
+    const mapCols = mapLayout[0].length;      // Eixo X (Largura)
+    
+    const worldWidth = mapCols * blockSize;
+    const worldLength = mapRows * blockSize;
+
+    // Calculamos o centro do mapa para posicionar o chão e o teto
+    const centerX = (worldWidth / 2) - (blockSize / 2);
+    const centerZ = (worldLength / 2) - (blockSize / 2);
+
+    // --- O CHÃO DA CAVERNA ---
+    const floorTex = new Texture(gl);
+    floorTex.load('./assets/rock_boulder_cracked_diff_4k.jpg'); 
+
+    const floorMesh = Mesh.createPlane(gl, worldWidth, worldLength); 
+    floorMesh.texture = floorTex; 
+    
+    // Repete a textura com base no tamanho da sala (Pra não ficar esticada)
+    floorMesh.texCoords = [
+        0, 0,                            mapCols, 0, 
+        mapCols, mapRows,                0, mapRows
+    ];
+
     floorMesh.setupBuffers(); 
     floorMesh.transform = new Transform();
-    floorMesh.transform.setPosition(0, -1.0, 0); 
+    // Coloca o plano exatamente no centro da sala, cobrindo tudo
+    floorMesh.transform.setPosition(centerX, -1.0, centerZ); 
     engine.meshes.push(floorMesh);
+
+    // --- 5. O TETO DA CAVERNA ---
+    const ceilingTex = new Texture(gl);
+    ceilingTex.load('./assets/rock_boulder_cracked_diff_4k.jpg'); 
+
+    const ceilingMesh = Mesh.createPlane(gl, worldWidth, worldLength);
+    ceilingMesh.texture = ceilingTex; 
+
+    // O teto também repete a textura como o chão
+    ceilingMesh.texCoords = [
+        0, 0,                            mapCols, 0, 
+        mapCols, mapRows,                0, mapRows
+    ];
+
+    ceilingMesh.setupBuffers();
+    ceilingMesh.transform = new Transform();
+    // Posição no alto (wallHeight), centro igual ao chão, e rotacionado
+    ceilingMesh.transform.setPosition(centerX, wallHeight - 1.0, centerZ); 
+    ceilingMesh.transform.setRotation(180, 0, 0); 
+    
+    engine.meshes.push(ceilingMesh);
+
 
     let lastTime = performance.now();
 
     // --- GAME LOOP ---
     function loop(time) {
-        // [AQUI FICA O RESTO DO SEU CÓDIGO DA FUNÇÃO LOOP QUE JÁ ESTAVA FUNCIONANDO]
         const deltaTime = (time - lastTime) / 1000;
         lastTime = time;
 

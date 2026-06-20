@@ -82,7 +82,10 @@ export class WebGLEngine {
 
         uniform vec3 uViewPos;       
         uniform vec3 uFlashlightPos; 
-        uniform vec3 uFront;         
+        uniform vec3 uFront;
+
+        uniform sampler2D uSampler;
+        uniform int uUseTexture;
 
         out vec4 FragColor;
 
@@ -90,45 +93,42 @@ export class WebGLEngine {
             vec3 norm = normalize(vNormal);
             vec3 viewDir = normalize(uViewPos - vFragPos);
 
-            // 1. LUZ AMBIENTE GLOBAL
-            // Breu absoluto não existe, deixamos um "fundo" levemente visível
-            vec3 ambient = vec3(0.04, 0.04, 0.06) * vColor;
+            // CORREÇÃO: O baseColor é vColor por padrão. 
+            // Se tiver textura, ele muda para a cor do pixel.
+            vec3 baseColor = vColor;
+            if (uUseTexture == 1) {
+                baseColor = texture(uSampler, vTexCoord).rgb;
+            }
 
-            // 2. AURA DO JOGADOR (Proximity Glow - O Segredo da Correção!)
-            // Ignoramos a "normal" da parede aqui. Se está perto, ganha luz.
-            // Isso simula a luz da lanterna rebatendo na sua roupa e iluminando ao redor.
+            // AGORA TROCAMOS vColor POR baseColor AQUI NAS CONTAS:
+            vec3 ambient = vec3(0.04, 0.04, 0.06) * baseColor;
+
             float distToBody = length(uViewPos - vFragPos);
-            // Atenuação curta (morre rápido pra não clarear o mapa todo)
             float attenGlow = 1.0 / (1.0 + 0.6 * distToBody + 0.4 * (distToBody * distToBody));
-            
-            vec3 glowColor = vec3(0.3, 0.3, 0.3); // Luz branca/cinza bem suave
-            vec3 proximityGlow = glowColor * vColor * attenGlow;
+            vec3 glowColor = vec3(0.3, 0.3, 0.3); 
+            // baseColor aqui
+            vec3 proximityGlow = glowColor * baseColor * attenGlow;
 
-            // 3. A LANTERNA DA MÃO (Spotlight Direcional)
             vec3 lightDir = normalize(uFlashlightPos - vFragPos);
             float distToFlashlight = length(uFlashlightPos - vFragPos);
             
             float theta = dot(normalize(-lightDir), normalize(uFront));
             float cutOff = cos(radians(15.0)); 
-            float outerCutOff = cos(radians(24.0)); // Aumentei o esfumaçado da borda
+            float outerCutOff = cos(radians(24.0)); 
             float epsilon = cutOff - outerCutOff;
             float intensity = clamp((theta - outerCutOff) / epsilon, 0.0, 1.0);
 
-            // Atenuação da lanterna vai mais longe
             float attenSpot = 1.0 / (1.0 + 0.045 * distToFlashlight + 0.0075 * (distToFlashlight * distToFlashlight));
-            
-            // A lanterna SIM respeita as quinas (dot product) para criar o visual 3D
             float diffSpot = max(dot(norm, lightDir), 0.0);
             
             vec3 flashColor = vec3(1.0, 0.85, 0.6) * 1.8; 
-            vec3 diffuseSpot = diffSpot * flashColor * vColor * intensity * attenSpot;
+            // baseColor aqui
+            vec3 diffuseSpot = diffSpot * flashColor * baseColor * intensity * attenSpot;
 
-            // Reflexo Especular
             vec3 reflectDir = reflect(-lightDir, norm);  
             float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
             vec3 specularSpot = spec * flashColor * 0.4 * intensity * attenSpot;
 
-            // A SOMA DE TODAS AS LUZES
             vec3 result = ambient + proximityGlow + diffuseSpot + specularSpot;
             FragColor = vec4(result, 1.0);
         }

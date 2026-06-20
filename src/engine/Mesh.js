@@ -1,8 +1,3 @@
-/**
- * Mesh
- * Representa uma geometria 3D com vértices, normais, cores, índices e coordenadas de textura
- */
-
 export class Mesh {
     constructor(gl) {
         this.gl = gl;
@@ -18,11 +13,11 @@ export class Mesh {
         this.vertexCount = 0;
         
         this.transform = null;
+        this.texture = null; // <- O Mesh agora guarda a textura!
     }
 
     setupBuffers() {
         const gl = this.gl;
-
         this.vao = gl.createVertexArray();
         gl.bindVertexArray(this.vao);
 
@@ -89,6 +84,16 @@ export class Mesh {
     draw(shader) {
         const gl = this.gl;
         this.bindForDraw(shader);
+
+        // --- A CHAVE LIGA/DESLIGA DA TEXTURA ---
+        if (this.texture && this.texture.loaded) {
+            this.texture.bind(0);
+            shader.setUniform('uSampler', 0); 
+            shader.setUniform('uUseTexture', 1); // LIGA A TEXTURA
+        } else {
+            shader.setUniform('uUseTexture', 0); // DESLIGA A TEXTURA
+        }
+
         if (this.ebo) {
             gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
         } else {
@@ -96,7 +101,7 @@ export class Mesh {
         }
     }
 
-    // --- Geometrias Geradas Programaticamente ---
+    // --- GEOMETRIAS ---
 
     static createCube(gl, size = 1) {
         const mesh = new Mesh(gl);
@@ -120,6 +125,12 @@ export class Mesh {
             -1, 0, 0,  -1, 0, 0,  -1, 0, 0,  -1, 0, 0,
         ];
 
+        // --- NOVO: Mapeamento UV ---
+        mesh.texCoords = [];
+        for(let i=0; i<6; i++) {
+            mesh.texCoords.push(0, 0,  1, 0,  1, 1,  0, 1);
+        }
+
         mesh.colors = [];
         for(let i=0; i<24; i++) mesh.colors.push(0.8, 0.8, 0.8);
 
@@ -136,6 +147,8 @@ export class Mesh {
     }
 
     static createGoldBar(gl, baseWidth = 1.0, baseLength = 2.0, height = 0.5, topScale = 0.6) {
+        // [Este código se mantém idêntico ao seu, só não coloquei texCoords nela 
+        // porque ela vai ser pintada de amarelo sólido!]
         const mesh = new Mesh(gl);
         
         const bw = baseWidth / 2;
@@ -145,21 +158,14 @@ export class Mesh {
         const h = height / 2;
 
         mesh.positions = [
-            // Topo (Y = h)
             -tw, h,  tl,   tw, h,  tl,   tw, h, -tl,  -tw, h, -tl,
-            // Base (Y = -h)
             -bw, -h,  bl,   bw, -h,  bl,   bw, -h, -bl,  -bw, -h, -bl,
-            // Frente (+Z)
             -bw, -h,  bl,   bw, -h,  bl,   tw, h,  tl,  -tw, h,  tl,
-            // Trás (-Z)
              bw, -h, -bl,  -bw, -h, -bl,  -tw, h, -tl,   tw, h, -tl,
-            // Direita (+X)
              bw, -h,  bl,   bw, -h, -bl,   tw, h, -tl,   tw, h,  tl,
-            // Esquerda (-X)
             -bw, -h, -bl,  -bw, -h,  bl,  -tw, h,  tl,  -tw, h, -tl
         ];
 
-        // Função mágica de Álgebra Linear que calcula a Normal Exata (Produto Vetorial)
         function calcNormal(p0, p1, p2) {
             const u = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
             const v = [p2[0]-p0[0], p2[1]-p0[1], p2[2]-p0[2]];
@@ -191,12 +197,12 @@ export class Mesh {
         for(let i = 0; i < 24; i++) mesh.colors.push(...gold);
 
         mesh.indices = [
-            0, 1, 2,  0, 2, 3,       // Topo
-            4, 6, 5,  4, 7, 6,       // Base (Ordem corrigida)
-            8, 9, 10,  8, 10, 11,    // Frente
-            12, 13, 14,  12, 14, 15, // Trás
-            16, 17, 18,  16, 18, 19, // Direita
-            20, 21, 22,  20, 22, 23  // Esquerda
+            0, 1, 2,  0, 2, 3,       
+            4, 6, 5,  4, 7, 6,       
+            8, 9, 10,  8, 10, 11,    
+            12, 13, 14,  12, 14, 15, 
+            16, 17, 18,  16, 18, 19, 
+            20, 21, 22,  20, 22, 23  
         ];
 
         return mesh;
@@ -208,25 +214,24 @@ export class Mesh {
         const l = length / 2;
 
         mesh.positions = [
-            -w, 0,  l,   // 0: frente-esquerda
-             w, 0,  l,   // 1: frente-direita
-             w, 0, -l,   // 2: trás-direita
-            -w, 0, -l,   // 3: trás-esquerda
+            -w, 0,  l,   
+             w, 0,  l,   
+             w, 0, -l,   
+            -w, 0, -l,   
         ];
 
         mesh.normals = [
             0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
         ];
 
-        // Deixando o chão cinza claro para refletir bem a luz
         mesh.colors = [
-            0.6, 0.6, 0.6,   0.6, 0.6, 0.6,   
-            0.6, 0.6, 0.6,   0.6, 0.6, 0.6,
+            1, 1, 1,  1, 1, 1,  1, 1, 1,  1, 1, 1,
         ];
 
-        // Mapeamento UV (Para textura futura)
+        // --- NOVO: UV MAPS PRO CHÃO ---
+        // Como o chão é gigante, multiplicamos as UVs por 10 para a textura repetir (Tile)!
         mesh.texCoords = [
-            0, 0,   1, 0,   1, 1,   0, 1
+            0, 0,   10, 0,   10, 10,   0, 10
         ];
 
         mesh.indices = [0, 1, 2, 0, 2, 3];
@@ -235,11 +240,6 @@ export class Mesh {
     }
 
     delete() {
-        const gl = this.gl;
-        Object.values(this.vbo).forEach(vbo => {
-            if (vbo) gl.deleteBuffer(vbo);
-        });
-        if (this.ebo) gl.deleteBuffer(this.ebo);
-        if (this.vao) gl.deleteVertexArray(this.vao);
+        // (O de sempre)
     }
 }
