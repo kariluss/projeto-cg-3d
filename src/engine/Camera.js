@@ -27,7 +27,7 @@ export class Camera {
         // --- SISTEMA DE COLISÃO ---
         this.mapLayout = null;
         this.blockSize = 1.0;
-        this.radius = 0.4; // O "tamanho" da barriga do jogador (Threshold)
+        this.radius = 0.4; // O tamanho do jogador (Threshold)
 
         this.updateProjectionMatrix();
         this.updateCameraVectors();
