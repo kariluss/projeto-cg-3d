@@ -99,11 +99,11 @@ export class Camera {
         // Variáveis para somar a intenção de movimento
         let moveDirFront = 0;
         let moveDirRight = 0;
-
-        if (input.isKeyPressed('w')) moveDirFront += 1;
-        if (input.isKeyPressed('s')) moveDirFront -= 1;
-        if (input.isKeyPressed('d')) moveDirRight += 1;
-        if (input.isKeyPressed('a')) moveDirRight -= 1;
+        
+        if (input.isKeyPressed('w') || input.isKeyPressed('arrowup')) moveDirFront += 1;
+        if (input.isKeyPressed('s') || input.isKeyPressed('arrowdown')) moveDirFront -= 1;
+        if (input.isKeyPressed('d') || input.isKeyPressed('arrowright')) moveDirRight += 1;
+        if (input.isKeyPressed('a') || input.isKeyPressed('arrowleft')) moveDirRight -= 1;
 
         let isMoving = (moveDirFront !== 0 || moveDirRight !== 0);
         const move = vec3.create();

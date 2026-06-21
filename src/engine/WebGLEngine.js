@@ -22,6 +22,8 @@ export class WebGLEngine {
 
         this.setupDefaultShader();
         this.setupEventListeners();
+        
+        this.onWindowResize();
     }
 
     initWebGL() {

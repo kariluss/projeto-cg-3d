@@ -103,33 +103,54 @@ export class Mesh {
 
     // --- GEOMETRIAS ---
 
-    static createCube(gl, size = 1) {
+    static createCube(gl, size = 1, uvRepeatX = 1.0, uvRepeatY = 1.0) {
         const mesh = new Mesh(gl);
         const s = size / 2;
 
         mesh.positions = [
-            -s, -s, s,  s, -s, s,  s, s, s,  -s, s, s, // Front
-            -s, -s, -s,  -s, s, -s,  s, s, -s,  s, -s, -s, // Back
-            -s, s, -s,  -s, s, s,  s, s, s,  s, s, -s, // Top
-            -s, -s, -s,  s, -s, -s,  s, -s, s,  -s, -s, s, // Bottom
-            s, -s, -s,  s, s, -s,  s, s, s,  s, -s, s, // Right
-            -s, -s, -s,  -s, -s, s,  -s, s, s,  -s, s, -s, // Left
+            // Front face
+            -s, -s,  s,    s, -s,  s,    s,  s,  s,   -s,  s,  s,
+            // Back face
+            -s, -s, -s,   -s,  s, -s,    s,  s, -s,    s, -s, -s,
+            // Top face
+            -s,  s, -s,   -s,  s,  s,    s,  s,  s,    s,  s, -s,
+            // Bottom face
+            -s, -s, -s,    s, -s, -s,    s, -s,  s,   -s, -s,  s,
+            // Right face
+             s, -s, -s,    s,  s, -s,    s,  s,  s,    s, -s,  s,
+            // Left face
+            -s, -s, -s,   -s, -s,  s,   -s,  s,  s,   -s,  s, -s,
         ];
 
         mesh.normals = [
-            0, 0, 1,  0, 0, 1,  0, 0, 1,  0, 0, 1,
-            0, 0, -1,  0, 0, -1,  0, 0, -1,  0, 0, -1,
-            0, 1, 0,  0, 1, 0,  0, 1, 0,  0, 1, 0,
-            0, -1, 0,  0, -1, 0,  0, -1, 0,  0, -1, 0,
-            1, 0, 0,  1, 0, 0,  1, 0, 0,  1, 0, 0,
-            -1, 0, 0,  -1, 0, 0,  -1, 0, 0,  -1, 0, 0,
+             0,  0,  1,   0,  0,  1,   0,  0,  1,   0,  0,  1, // Front
+             0,  0, -1,   0,  0, -1,   0,  0, -1,   0,  0, -1, // Back
+             0,  1,  0,   0,  1,  0,   0,  1,  0,   0,  1,  0, // Top
+             0, -1,  0,   0, -1,  0,   0, -1,  0,   0, -1,  0, // Bottom
+             1,  0,  0,   1,  0,  0,   1,  0,  0,   1,  0,  0, // Right
+            -1,  0,  0,  -1,  0,  0,  -1,  0,  0,  -1,  0,  0, // Left
         ];
 
-        // --- NOVO: Mapeamento UV ---
-        mesh.texCoords = [];
-        for(let i=0; i<6; i++) {
-            mesh.texCoords.push(0, 0,  1, 0,  1, 1,  0, 1);
-        }
+        // --- CORREÇÃO DO UV MAP ---
+        // Aplicamos a repetição (uvRepeatX e uvRepeatY).
+        // rx = Horizontal, ry = Vertical
+        const rx = uvRepeatX;
+        const ry = uvRepeatY;
+        
+        mesh.texCoords = [
+            // Front (Parede: Largura X, Altura Y)
+            0, 0,   rx, 0,   rx, ry,   0, ry,
+            // Back (Parede: Largura X, Altura Y)
+            0, 0,   0, ry,   rx, ry,   rx, 0, 
+            // Top (Chão/Teto: Largura X, Largura Z) -> usamos rx pros dois lados para ficar quadrado
+            0, 0,   0, rx,   rx, rx,   rx, 0, 
+            // Bottom
+            0, 0,   rx, 0,   rx, rx,   0, rx, 
+            // Right (Parede: Profundidade Z, Altura Y) -> assumimos Z = X, então rx
+            0, 0,   0, ry,   rx, ry,   rx, 0, 
+            // Left
+            0, 0,   rx, 0,   rx, ry,   0, ry, 
+        ];
 
         mesh.colors = [];
         for(let i=0; i<24; i++) mesh.colors.push(0.8, 0.8, 0.8);
