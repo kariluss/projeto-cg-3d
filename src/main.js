@@ -13,13 +13,26 @@ window.onload = async () => {
 
     // --- 1. O MAPA DO LABIRINTO (1 = Parede, 0 = Caminho) ---
     const mapLayout = [
-        [1, 1, 1, 1, 1, 1, 1],
-        [1, 0, 0, 0, 0, 0, 1],
-        [1, 0, 1, 1, 1, 0, 1],
-        [1, 0, 0, 0, 1, 0, 1],
-        [1, 1, 1, 0, 1, 0, 1],
-        [1, 0, 0, 0, 0, 0, 1],
-        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // linha 0  — entrada na col 8
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 1], // linha 1
+        [1, 0, 1, 0, 1, 0, 1, 1, 1, 1], // linha 2
+        [1, 0, 1, 0, 0, 0, 0, 0, 0, 1], // linha 3
+        [1, 0, 1, 1, 1, 1, 1, 0, 1, 1], // linha 4
+        [1, 0, 0, 0, 0, 0, 1, 0, 0, 1], // linha 5
+        [1, 1, 1, 0, 1, 0, 1, 1, 0, 1], // linha 6
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 1], // linha 7
+        [1, 0, 1, 1, 1, 1, 1, 0, 1, 1], // linha 8
+        [1, 0, 0, 0, 0, 0, 0, 0, 1, 1], // linha 9
+        [1, 1, 1, 0, 1, 1, 1, 1, 1, 1], // linha 10
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 1], // linha 11
+        [1, 0, 1, 1, 1, 0, 1, 1, 0, 1], // linha 12
+        [1, 0, 1, 0, 0, 0, 0, 1, 0, 1], // linha 13
+        [1, 0, 1, 0, 1, 1, 1, 1, 0, 1], // linha 14
+        [1, 0, 0, 0, 1, 0, 0, 0, 0, 1], // linha 15
+        [1, 1, 1, 0, 1, 0, 1, 1, 1, 1], // linha 16
+        [1, 0, 0, 0, 0, 0, 1, 0, 0, 1], // linha 17
+        [1, 0, 1, 1, 1, 0, 1, 0, 1, 1], // linha 18
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // linha 19 — saída na col 5
     ];
 
     const blockSize = 2.0;
@@ -55,7 +68,7 @@ window.onload = async () => {
     }
 
     // --- 2. POSICIONAR O JOGADOR NO MAPA ---
-    engine.camera.position[0] = 1 * blockSize;
+    engine.camera.position[0] = 8 * blockSize;
     engine.camera.position[1] = 0.5; // Altura dos olhos
     engine.camera.position[2] = 1 * blockSize;
 
@@ -64,7 +77,7 @@ window.onload = async () => {
     const goldBarMesh = Mesh.createGoldBar(gl, 1.0, 2.0, 0.5, 0.6);
     goldBarMesh.setupBuffers(); 
     goldBarMesh.transform = new Transform();
-    goldBarMesh.transform.setPosition(3 * blockSize, 0.0, 3 * blockSize); 
+    goldBarMesh.transform.setPosition(5 * blockSize, 0.0, 18 * blockSize); 
     goldBarMesh.transform.setScale(0.3, 0.3, 0.3);
     engine.meshes.push(goldBarMesh);
 
