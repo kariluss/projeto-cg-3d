@@ -184,6 +184,11 @@ export class WebGLEngine {
         }
 
         for (const mesh of meshes) {
+            if (mesh.doubleSided) {
+                this.gl.disable(this.gl.CULL_FACE); // Desliga
+            } else {
+                this.gl.enable(this.gl.CULL_FACE);  // Liga
+            }
             if (mesh.transform) {
                 const modelMatrix = mesh.transform.getModelMatrix();
                 this.shader.setUniformArray('uModel', modelMatrix);

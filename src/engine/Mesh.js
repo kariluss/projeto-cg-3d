@@ -13,7 +13,21 @@ export class Mesh {
         this.vertexCount = 0;
         
         this.transform = null;
-        this.texture = null; // <- O Mesh agora guarda a textura!
+        this.texture = null;
+        this.doubleSided = false;
+    }
+
+    clone() {
+        const cloned = new Mesh(this.gl);
+        cloned.vao = this.vao;
+        cloned.vbo = this.vbo;
+        cloned.ebo = this.ebo;
+        cloned.vertexCount = this.vertexCount;
+        cloned.texture = this.texture;
+        cloned.colors = this.colors;
+        cloned.transform = null;
+        cloned.doubleSided = this.doubleSided;
+        return cloned;
     }
 
     setupBuffers() {
