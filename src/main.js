@@ -36,13 +36,13 @@ window.onload = async () => {
     ];
 
     const blockSize = 2.0;
-    const wallHeight = 3.0; // Paredes altas
+    const wallHeight = 2.5;
 
     engine.camera.setCollisionMap(mapLayout, blockSize);
 
     const wallTex = new Texture(gl);
     
-    wallTex.load('./assets/rock_boulder_cracked_diff_1k.jpg');
+    wallTex.load('./assets/rock_boulder_cracked_diff_256p.jpg');
 
     // Lendo a matriz e construindo a caverna
     for (let z = 0; z < mapLayout.length; z++) {
@@ -111,7 +111,7 @@ window.onload = async () => {
 
     // --- O CHÃO DA CAVERNA ---
     const floorTex = new Texture(gl);
-    floorTex.load('./assets/rock_boulder_cracked_diff_1k.jpg'); 
+    floorTex.load('./assets/rock_boulder_cracked_diff_256p.jpg'); 
 
     const floorMesh = Mesh.createPlane(gl, worldWidth, worldLength); 
     floorMesh.texture = floorTex; 
@@ -128,7 +128,7 @@ window.onload = async () => {
 
     // --- O TETO DA CAVERNA ---
     const ceilingTex = new Texture(gl);
-    ceilingTex.load('./assets/rock_boulder_cracked_diff_1k.jpg'); 
+    ceilingTex.load('./assets/rock_boulder_cracked_diff_256p.jpg'); 
 
     const ceilingMesh = Mesh.createPlane(gl, worldWidth, worldLength);
     ceilingMesh.texture = ceilingTex; 
@@ -146,7 +146,83 @@ window.onload = async () => {
     engine.meshes.push(ceilingMesh);
 
 
+    // --- 6. MORCEGOS NO TETO ---
+    // 1. Carrega o modelo Base UMA vez
+    const baseBatMesh = await ObjLoader.load(gl, './assets/bat_lowpoly_5.obj');
+    baseBatMesh.doubleSided = true;
+    
+    const batTex = new Texture(gl);
+    batTex.load('./assets/bat_diffuse.png');
+    baseBatMesh.texture = batTex;
+
+    // 2. Percorre o mapa procurando "Caminhos" (0)
+    for (let z = 0; z < mapLayout.length; z++) {
+        for (let x = 0; x < mapLayout[z].length; x++) {
+            
+            // Se for um corredor (0) e cair na probabilidade de 80% 
+            if (mapLayout[z][x] === 0 && Math.random() < 0.3) {
+                
+                // Cria um clone leve
+                const bat = baseBatMesh.clone();
+                bat.transform = new Transform();
+                
+                // Posição: X e Z no meio do bloco. Y grudado no teto (wallHeight - 1.0)
+                // Valor aleatório no X e Z pro morcego não ficar muito centralizado
+                const randomOffsetX = (Math.random() - 0.5) * (blockSize * 0.5);
+                const randomOffsetZ = (Math.random() - 0.5) * (blockSize * 0.5);
+                
+                bat.transform.setPosition(
+                    (x * blockSize) + randomOffsetX, 
+                    wallHeight - 1.5, // Altura do teto (pouquinho pra baixo)
+                    (z * blockSize) + randomOffsetZ
+                );
+                
+                const randomYaw = Math.random() * 360;
+                bat.transform.setRotation(0, randomYaw, -90);
+                
+                bat.transform.setScale(0.8, 0.8, 0.8); 
+                
+                engine.meshes.push(bat);
+            }
+        }
+    }
+
+    // --- 7. CRÂNIOS PELO CHÃO ---
+    let baseSkullMesh = null;
+    try {
+        baseSkullMesh = await ObjLoader.load(gl, './assets/skull_lowpoly.obj');
+        const skullTex = new Texture(gl);
+        skullTex.load('./assets/skull_diffuse.jpg');
+        baseSkullMesh.texture = skullTex;
+        for (let z = 0; z < mapLayout.length; z++) {
+            for (let x = 0; x < mapLayout[z].length; x++) {
+                // Probabilidade de 80% de ter um crânio
+                if (mapLayout[z][x] === 0 && Math.random() < 0.8) {
+                    const skull = baseSkullMesh.clone();
+                    skull.transform = new Transform();
+                    const randomOffsetX = (Math.random() - 0.5) * (blockSize * 0.7);
+                    const randomOffsetZ = (Math.random() - 0.5) * (blockSize * 0.7);
+                    skull.transform.setPosition(
+                        (x * blockSize) + randomOffsetX, 
+                        -0.9, 
+                        (z * blockSize) + randomOffsetZ
+                    );
+                    // Rotação aleatória
+                    const random = Math.random() * 360;
+                    skull.transform.setRotation(random, random, 90);
+                    skull.transform.setScale(0.015, 0.015, 0.015); 
+                    engine.meshes.push(skull);
+                }
+            }
+        }
+        console.log("Crânios espalhados pelo chão!");
+    } catch (e) {
+        console.error("Erro ao carregar o crânio.", e);
+    }
+
+
     let lastTime = performance.now();
+
 
     // --- GAME LOOP ---
     function loop(time) {
@@ -195,6 +271,8 @@ window.onload = async () => {
                 180
             );
         }
+
+
         // ----------------------------------------------
         // ----------------------------------------------
 
