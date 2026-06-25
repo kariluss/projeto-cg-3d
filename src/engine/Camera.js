@@ -16,8 +16,8 @@ export class Camera {
         this.near = 0.1;
         this.far = 1000.0;
 
-        this.speed = 5.0; 
-        this.sensitivity = 0.1; 
+        this.speed = 1.0; 
+        this.sensitivity = 0.05; 
 
         this.viewMatrix = mat4.create();
         this.projMatrix = mat4.create();

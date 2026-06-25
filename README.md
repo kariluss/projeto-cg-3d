@@ -1,5 +1,9 @@
 # 🦇 Cave Maze — Projeto de CG
 
+## Demonstração em vídeo disponível no youtube
+
+[![Demonstração do Cave Maze](https://img.youtube.com/vi/cO9iRoNuNRU/0.jpg)](https://youtu.be/cO9iRoNuNRU)
+
 Bem-vindo ao **Cave Maze**, um projeto desenvolvido para a disciplina de **Computação Gráfica**.
 
 Este é um simulador simples de uma exploração dentro de uma caverna labirintica, construído sobre um motor gráfico 3D web.
