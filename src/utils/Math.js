@@ -3,6 +3,8 @@
  * Operações com vetores, matrizes e quaternions
  */
 
+// não está mais sendo utilizado, porém será deixado por hora aqui
+
 export class Vec3 {
     constructor(x = 0, y = 0, z = 0) {
         this.x = x;

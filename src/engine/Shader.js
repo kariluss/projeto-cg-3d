@@ -88,6 +88,16 @@ export class Shader {
         return this;
     }
 
+    // Função auxiliar para injetar coordenadas x, y, z (Ex: Luz e Câmera)
+    setUniform3f(name, x, y, z) {
+        if (this.uniforms[name]) {
+            this.gl.uniform3f(this.uniforms[name].location, x, y, z);
+        } else {
+            console.warn(`Uniform '${name}' not found in shader`);
+        }
+        return this;
+    }
+
     setUniform(name, ...args) {
         if (!this.uniforms[name]) {
             console.warn(`Uniform '${name}' not found in shader`);
@@ -126,13 +136,13 @@ export class Shader {
                 gl.uniform1i(uniform.location, args[0] ? 1 : 0);
                 break;
             case gl.FLOAT_MAT2:
-                gl.uniformMatrix2fv(uniform.location, false, args[0].data || args[0]);
+                gl.uniformMatrix2fv(uniform.location, false, args[0]);
                 break;
             case gl.FLOAT_MAT3:
-                gl.uniformMatrix3fv(uniform.location, false, args[0].data || args[0]);
+                gl.uniformMatrix3fv(uniform.location, false, args[0]);
                 break;
             case gl.FLOAT_MAT4:
-                gl.uniformMatrix4fv(uniform.location, false, args[0].data || args[0]);
+                gl.uniformMatrix4fv(uniform.location, false, args[0]);
                 break;
             case gl.SAMPLER_2D:
                 gl.uniform1i(uniform.location, args[0]);
@@ -155,22 +165,17 @@ export class Shader {
 
         const uniform = this.uniforms[name];
         const gl = this.gl;
+        const type = uniform.type;
 
-        // Se for uma matriz, passa o data directly
-        if (array.data) {
-            const type = uniform.type;
-            if (type === gl.FLOAT_MAT4) {
-                gl.uniformMatrix4fv(uniform.location, false, array.data);
-            } else if (type === gl.FLOAT_MAT3) {
-                gl.uniformMatrix3fv(uniform.location, false, array.data);
-            } else if (type === gl.FLOAT_MAT2) {
-                gl.uniformMatrix2fv(uniform.location, false, array.data);
-            }
+        if (type === gl.FLOAT_MAT4) {
+            gl.uniformMatrix4fv(uniform.location, false, array);
+        } else if (type === gl.FLOAT_MAT3) {
+            gl.uniformMatrix3fv(uniform.location, false, array);
+        } else if (type === gl.FLOAT_MAT2) {
+            gl.uniformMatrix2fv(uniform.location, false, array);
         } else {
-            // Para arrays de floats/ints
-            const type = uniform.type;
+            // Para arrays de floats ou ints
             const size = array.length;
-
             if (type === gl.FLOAT || size === 1) {
                 gl.uniform1fv(uniform.location, array);
             } else if (size === 2) {

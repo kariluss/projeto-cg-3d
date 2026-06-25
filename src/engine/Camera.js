@@ -1,143 +1,166 @@
-/**
- * Camera
- * Câmera 3D com controle de perspectiva e navegação
- */
-
-import { Vec3, Mat4, MathUtils } from '../utils/Math.js';
+import { vec3, mat4 } from 'gl-matrix';
 import { input } from '../utils/Input.js';
 
 export class Camera {
     constructor(canvas) {
         this.canvas = canvas;
-        this.position = new Vec3(0, 2, 5);
-        this.target = new Vec3(0, 0, 0);
-        this.up = new Vec3(0, 1, 0);
+        
+        this.position = vec3.fromValues(0, 1.5, 5); 
+        this.up = vec3.fromValues(0, 1, 0);
+        this.front = vec3.fromValues(0, 0, -1);
 
-        // Ângulos de rotação (yaw, pitch)
-        this.yaw = -Math.PI / 2;
-        this.pitch = 0;
+        this.yaw = -90.0; 
+        this.pitch = 0.0;
 
-        // Propriedades de câmera
-        this.fov = MathUtils.radians(45);
+        this.fov = 45.0 * Math.PI / 180.0; 
         this.near = 0.1;
-        this.far = 1000;
+        this.far = 1000.0;
 
-        // Velocidade de movimento
-        this.speed = 10; // unidades por segundo
-        this.sensitivity = 0.003; // sensibilidade do mouse
+        this.speed = 5.0; 
+        this.sensitivity = 0.1; 
 
-        // Matrizes
-        this._viewMatrix = Mat4.identity();
-        this._projMatrix = Mat4.identity();
+        this.viewMatrix = mat4.create();
+        this.projMatrix = mat4.create();
+
+        this.walkTime = 0.0; 
+        
+        // --- SISTEMA DE COLISÃO ---
+        this.mapLayout = null;
+        this.blockSize = 1.0;
+        this.radius = 0.4; // O tamanho do jogador (Threshold)
 
         this.updateProjectionMatrix();
-        this.updateViewMatrix();
+        this.updateCameraVectors();
+    }
+
+    setCollisionMap(layout, blockSize) {
+        this.mapLayout = layout;
+        this.blockSize = blockSize;
+    }
+
+    // Verifica se um ponto exato é parede
+    isWall(x, z) {
+        if (!this.mapLayout) return false;
+
+        const col = Math.round(x / this.blockSize);
+        const row = Math.round(z / this.blockSize);
+
+        if (row < 0 || row >= this.mapLayout.length || col < 0 || col >= this.mapLayout[0].length) {
+            return true;
+        }
+
+        return this.mapLayout[row][col] === 1;
+    }
+
+    // Verifica se a Hitbox (Raio) do jogador está batendo na parede
+    checkCollision(x, z) {
+        const r = this.radius;
+        // Checamos os 4 cantos ao redor do jogador
+        return this.isWall(x - r, z - r) ||
+               this.isWall(x + r, z - r) ||
+               this.isWall(x - r, z + r) ||
+               this.isWall(x + r, z + r);
+    }
+
+    updateCameraVectors() {
+        const front = vec3.create();
+        front[0] = Math.cos(this.yaw * Math.PI / 180) * Math.cos(this.pitch * Math.PI / 180);
+        front[1] = Math.sin(this.pitch * Math.PI / 180);
+        front[2] = Math.sin(this.yaw * Math.PI / 180) * Math.cos(this.pitch * Math.PI / 180);
+        vec3.normalize(this.front, front);
     }
 
     updateViewMatrix() {
-        // Calcular direção baseado em yaw e pitch
-        const direction = new Vec3(
-            Math.cos(this.pitch) * Math.cos(this.yaw),
-            Math.sin(this.pitch),
-            Math.cos(this.pitch) * Math.sin(this.yaw)
-        );
+        const target = vec3.create();
+        const visualPosition = vec3.clone(this.position);
+        
+        visualPosition[1] += Math.sin(this.walkTime * 10.0) * 0.05; 
 
-        // Alvo é a posição + direção
-        this.target = this.position.add(direction);
-
-        // Criar matrix lookAt
-        this._viewMatrix = Mat4.lookAt(this.position, this.target, this.up);
+        vec3.add(target, visualPosition, this.front);
+        mat4.lookAt(this.viewMatrix, visualPosition, target, this.up);
     }
 
     updateProjectionMatrix() {
         const aspect = this.canvas.clientWidth / this.canvas.clientHeight;
-        this._projMatrix = Mat4.perspective(
-            this.fov,
-            aspect,
-            this.near,
-            this.far
-        );
+        mat4.perspective(this.projMatrix, this.fov, aspect, this.near, this.far);
     }
 
     update(deltaTime) {
-        const speed = input.isKeyPressed('shift') ? this.speed * 2 : this.speed;
+        let currentSpeed = this.speed * deltaTime;
+        if (input.isKeyPressed('shift')) currentSpeed *= 2;
 
-        // Movimento WASD
-        const forward = new Vec3(
-            Math.cos(this.pitch) * Math.cos(this.yaw),
-            0,
-            Math.cos(this.pitch) * Math.sin(this.yaw)
-        ).normalize();
+        const right = vec3.create();
+        vec3.cross(right, this.front, this.up);
+        vec3.normalize(right, right);
 
-        const right = forward.cross(this.up).normalize();
+        const flatFront = vec3.fromValues(this.front[0], 0, this.front[2]);
+        vec3.normalize(flatFront, flatFront);
 
-        if (input.isKeyPressed('w')) {
-            this.position = this.position.add(forward.multiply(speed * deltaTime));
-        }
-        if (input.isKeyPressed('s')) {
-            this.position = this.position.subtract(forward.multiply(speed * deltaTime));
-        }
-        if (input.isKeyPressed('d')) {
-            this.position = this.position.add(right.multiply(speed * deltaTime));
-        }
-        if (input.isKeyPressed('a')) {
-            this.position = this.position.subtract(right.multiply(speed * deltaTime));
+        // Variáveis para somar a intenção de movimento
+        let moveDirFront = 0;
+        let moveDirRight = 0;
+        
+        if (input.isKeyPressed('w') || input.isKeyPressed('arrowup')) moveDirFront += 1;
+        if (input.isKeyPressed('s') || input.isKeyPressed('arrowdown')) moveDirFront -= 1;
+        if (input.isKeyPressed('d') || input.isKeyPressed('arrowright')) moveDirRight += 1;
+        if (input.isKeyPressed('a') || input.isKeyPressed('arrowleft')) moveDirRight -= 1;
+
+        let isMoving = (moveDirFront !== 0 || moveDirRight !== 0);
+        const move = vec3.create();
+
+        if (isMoving) {
+            // "Penalidade" de andar de lado (Strafe é 60% da velocidade)
+            moveDirRight *= 0.6; 
+
+            // Junta os dois movimentos
+            const tempFront = vec3.create();
+            const tempRight = vec3.create();
+            vec3.scale(tempFront, flatFront, moveDirFront);
+            vec3.scale(tempRight, right, moveDirRight);
+            
+            vec3.add(move, tempFront, tempRight);
+
+            // NORMALIZAÇÃO: Evita que a diagonal seja mais rápida que andar reto
+            vec3.normalize(move, move);
+            vec3.scale(move, move, currentSpeed);
         }
 
-        // Movimento vertical (Space / Ctrl)
-        if (input.isKeyPressed(' ')) {
-            this.position.y += speed * deltaTime;
-        }
-        if (input.isKeyPressed('control')) {
-            this.position.y -= speed * deltaTime;
+        // --- SISTEMA DE COLISÃO DESLIZANTE COM RAIO ---
+        // (O resto do código continua igual...)
+        const nextX = this.position[0] + move[0];
+        if (!this.checkCollision(nextX, this.position[2])) {
+            this.position[0] = nextX;
         }
 
-        // Controle de mouse
-        if (input.isMouseDown()) {
-            const delta = input.getMouseDelta();
+        const nextZ = this.position[2] + move[2];
+        if (!this.checkCollision(this.position[0], nextZ)) {
+            this.position[2] = nextZ;
+        }
+
+        // Head Bobbing Timer
+        if (isMoving) {
+            this.walkTime += deltaTime;
+        } else {
+            this.walkTime = 0; 
+        }
+
+        const delta = input.getMouseDelta();
+        if (delta.x !== 0 || delta.y !== 0) {
             this.yaw += delta.x * this.sensitivity;
             this.pitch -= delta.y * this.sensitivity;
 
-            // Limitar pitch
-            this.pitch = MathUtils.clamp(this.pitch, -Math.PI / 2, Math.PI / 2);
+            if (this.pitch > 89.0) this.pitch = 89.0;
+            if (this.pitch < -89.0) this.pitch = -89.0;
+
+            this.updateCameraVectors();
         }
 
         this.updateViewMatrix();
     }
 
-    getViewMatrix() {
-        return this._viewMatrix;
-    }
-
-    getProjectionMatrix() {
-        return this._projMatrix;
-    }
-
-    getPosition() {
-        return this.position.clone();
-    }
-
-    setPosition(x, y, z) {
-        this.position = new Vec3(x, y, z);
-        this.updateViewMatrix();
-        return this;
-    }
-
-    lookAt(target, up = null) {
-        this.target = target;
-        if (up) this.up = up;
-        this._viewMatrix = Mat4.lookAt(this.position, this.target, this.up);
-        return this;
-    }
-
-    setFieldOfView(degrees) {
-        this.fov = MathUtils.radians(degrees);
-        this.updateProjectionMatrix();
-        return this;
-    }
-
-    onWindowResize() {
-        this.updateProjectionMatrix();
-        return this;
-    }
+    getViewMatrix() { return this.viewMatrix; }
+    getProjectionMatrix() { return this.projMatrix; }
+    getPosition() { return [this.position[0], this.position[1], this.position[2]]; }
+    
+    onWindowResize() { this.updateProjectionMatrix(); }
 }
