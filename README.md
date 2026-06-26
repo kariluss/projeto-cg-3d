@@ -8,6 +8,9 @@ Bem-vindo ao **Cave Maze**, um projeto desenvolvido para a disciplina de **Compu
 
 Este é um simulador simples de uma exploração dentro de uma caverna labirintica, construído sobre um motor gráfico 3D web.
 
+## Apresentação em Slides do Projeto
+[📽️](https://docs.google.com/presentation/d/18v6I-t37wzH0QB5ZadtpAIKKP1MNbbB8/edit?usp=sharing&ouid=113596562893184878908&rtpof=true&sd=true).
+
 ## 🛠️ Tecnologias
 
 - **Linguagem:** Javascript
